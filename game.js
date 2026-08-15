@@ -33,7 +33,7 @@ const shieldThickness = 12;
 const maxEnemies = 10;
 
 const powerUpDuration = 10000;
-const shieldBoostMultiplier = 1.2;
+const shieldBoostMultiplier = 1.8;
 const powerUpChance = 0.07;
 const powerUpColor = "#B6FF00";
 
@@ -144,7 +144,15 @@ function spawnEnemy() {
   const direction = Math.atan2(centerY - y, centerX - x);
 
   // A power-up uses an enemy slot and moves exactly like an enemy.
-  const isPowerUp = Math.random() < powerUpChance;
+  const powerUpIsActive = performance.now() < shieldBoostEndTime;
+
+const powerUpAlreadyOnScreen = enemies.some((enemy) => {
+  return enemy.isPowerUp;
+});
+
+const canSpawnPowerUp = !powerUpIsActive && !powerUpAlreadyOnScreen;
+
+const isPowerUp = canSpawnPowerUp && Math.random() < powerUpChance;
 
   enemies.push({
     x,
