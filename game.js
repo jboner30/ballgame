@@ -27,6 +27,7 @@ const shieldDistance = 105;
 const shieldRadius = 105;
 const shieldArcSize = Math.PI / 2.8; // Width of the curved shield
 const shieldThickness = 12;
+const maxEnemies = 10;
 
 function resizeCanvas() {
   const pixelRatio = window.devicePixelRatio || 1;
@@ -143,11 +144,14 @@ function update(deltaTime) {
   spawnTimer += deltaTime;
 
   if (spawnTimer >= spawnDelay) {
+  // Do not create more balls while 10 are already active.
+  if (enemies.length < maxEnemies) {
     spawnEnemy();
-    spawnTimer = 0;
-
-    spawnDelay = Math.max(260, 900 - score * 12);
   }
+
+  spawnTimer = 0;
+  spawnDelay = Math.max(260, 900 - score * 12);
+}
 
   const shield = getShield();
 
