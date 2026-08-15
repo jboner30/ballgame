@@ -75,7 +75,34 @@ function getShield() {
 }
 
 function spawnEnemy() {
-  const side = Math.floor(Math.random() * 4);
+  const sides = [0, 1, 2, 3];
+
+  // Do not spawn an enemy directly opposite a nearby enemy.
+  const safeSides = sides.filter((side) => {
+    return !enemies.some((enemy) => {
+      const enemyDistanceFromCore = Math.hypot(
+        enemy.x - centerX,
+        enemy.y - centerY
+      );
+
+      // Only restrict spawning while the existing enemy is threatening.
+      if (enemyDistanceFromCore > 280) {
+        return false;
+      }
+
+      const oppositeSide =
+        enemy.spawnSide === 0 ? 2 :
+        enemy.spawnSide === 1 ? 3 :
+        enemy.spawnSide === 2 ? 0 : 1;
+
+      return side === oppositeSide;
+    });
+  });
+
+  // If every side is restricted, use the full list rather than stopping spawns.
+  const availableSides = safeSides.length > 0 ? safeSides : sides;
+  const side = availableSides[Math.floor(Math.random() * availableSides.length)];
+
   let x;
   let y;
 
@@ -101,7 +128,8 @@ function spawnEnemy() {
     y,
     radius: 10,
     velocityX: Math.cos(direction) * speed,
-    velocityY: Math.sin(direction) * speed
+    velocityY: Math.sin(direction) * speed,
+    spawnSide: side
   });
 }
 
