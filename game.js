@@ -1,0 +1,291 @@
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const scoreElement = document.getElementById("score");
+const healthElement = document.getElementById("health");
+const messageElement = document.getElementById("message");
+
+let width = 0;
+let height = 0;
+let centerX = 0;
+let centerY = 0;
+
+let mouseX = 0;
+let mouseY = 0;
+
+let score = 0;
+let health = 5;
+let enemies = [];
+let running = false;
+let gameOver = false;
+let lastTime = 0;
+let spawnTimer = 0;
+let spawnDelay = 900;
+
+const coreRadius = 25;
+const shieldDistance = 105;
+const shieldLength = 150;
+const shieldThickness = 12;
+
+function resizeCanvas() {
+  const pixelRatio = window.devicePixelRatio || 1;
+
+  width = window.innerWidth;
+  height = window.innerHeight;
+
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+  centerX = width / 2;
+  centerY = height / 2;
+
+  if (mouseX === 0 && mouseY === 0) {
+    mouseX = centerX;
+    mouseY = centerY - shieldDistance;
+  }
+}
+
+function getShield() {
+  const angle = Math.atan2(mouseY - centerY, mouseX - centerX);
+
+  const shieldX = centerX + Math.cos(angle) * shieldDistance;
+  const shieldY = centerY + Math.sin(angle) * shieldDistance;
+
+  const perpendicularX = -Math.sin(angle);
+  const perpendicularY = Math.cos(angle);
+
+  const startX = shieldX - perpendicularX * shieldLength / 2;
+  const startY = shieldY - perpendicularY * shieldLength / 2;
+  const endX = shieldX + perpendicularX * shieldLength / 2;
+  const endY = shieldY + perpendicularY * shieldLength / 2;
+
+  return {
+    x: shieldX,
+    y: shieldY,
+    startX,
+    startY,
+    endX,
+    endY
+  };
+}
+
+function spawnEnemy() {
+  const side = Math.floor(Math.random() * 4);
+  let x;
+  let y;
+
+  if (side === 0) {
+    x = Math.random() * width;
+    y = -30;
+  } else if (side === 1) {
+    x = width + 30;
+    y = Math.random() * height;
+  } else if (side === 2) {
+    x = Math.random() * width;
+    y = height + 30;
+  } else {
+    x = -30;
+    y = Math.random() * height;
+  }
+
+  const speed = 85 + Math.min(score * 2, 180);
+  const direction = Math.atan2(centerY - y, centerX - x);
+
+  enemies.push({
+    x,
+    y,
+    radius: 10,
+    velocityX: Math.cos(direction) * speed,
+    velocityY: Math.sin(direction) * speed
+  });
+}
+
+function distanceToLineSegment(pointX, pointY, lineStartX, lineStartY, lineEndX, lineEndY) {
+  const lineX = lineEndX - lineStartX;
+  const lineY = lineEndY - lineStartY;
+
+  const pointLineX = pointX - lineStartX;
+  const pointLineY = pointY - lineStartY;
+
+  const lineLengthSquared = lineX * lineX + lineY * lineY;
+
+  let position = (pointLineX * lineX + pointLineY * lineY) / lineLengthSquared;
+  position = Math.max(0, Math.min(1, position));
+
+  const closestX = lineStartX + lineX * position;
+  const closestY = lineStartY + lineY * position;
+
+  return Math.hypot(pointX - closestX, pointY - closestY);
+}
+
+function update(deltaTime) {
+  spawnTimer += deltaTime;
+
+  if (spawnTimer >= spawnDelay) {
+    spawnEnemy();
+    spawnTimer = 0;
+
+    spawnDelay = Math.max(260, 900 - score * 12);
+  }
+
+  const shield = getShield();
+
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const enemy = enemies[i];
+
+    enemy.x += enemy.velocityX * deltaTime / 1000;
+    enemy.y += enemy.velocityY * deltaTime / 1000;
+
+    const shieldDistanceFromEnemy = distanceToLineSegment(
+      enemy.x,
+      enemy.y,
+      shield.startX,
+      shield.startY,
+      shield.endX,
+      shield.endY
+    );
+
+    if (shieldDistanceFromEnemy < enemy.radius + shieldThickness / 2) {
+      enemies.splice(i, 1);
+      score++;
+      scoreElement.textContent = score;
+      continue;
+    }
+
+    const coreDistance = Math.hypot(enemy.x - centerX, enemy.y - centerY);
+
+    if (coreDistance < coreRadius + enemy.radius) {
+      enemies.splice(i, 1);
+      health--;
+      healthElement.textContent = health;
+
+      if (health <= 0) {
+        endGame();
+      }
+    }
+  }
+}
+
+function drawCore() {
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, coreRadius, 0, Math.PI * 2);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, coreRadius + 10, 0, Math.PI * 2);
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function drawShield() {
+  const shield = getShield();
+
+  ctx.beginPath();
+  ctx.moveTo(shield.startX, shield.startY);
+  ctx.lineTo(shield.endX, shield.endY);
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = shieldThickness;
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(shield.x, shield.y, shieldThickness / 2, 0, Math.PI * 2);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+}
+
+function drawEnemies() {
+  for (const enemy of enemies) {
+    ctx.beginPath();
+    ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+  }
+}
+
+function drawMouseMarker() {
+  ctx.beginPath();
+  ctx.arc(mouseX, mouseY, 3, 0, Math.PI * 2);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, width, height);
+
+  drawCore();
+  drawShield();
+  drawEnemies();
+  drawMouseMarker();
+}
+
+function gameLoop(timestamp) {
+  if (!running) {
+    return;
+  }
+
+  const deltaTime = Math.min(timestamp - lastTime, 50);
+  lastTime = timestamp;
+
+  update(deltaTime);
+  draw();
+
+  requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+  score = 0;
+  health = 5;
+  enemies = [];
+  spawnTimer = 0;
+  spawnDelay = 900;
+  running = true;
+  gameOver = false;
+
+  scoreElement.textContent = score;
+  healthElement.textContent = health;
+  messageElement.style.display = "none";
+
+  lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  running = false;
+  gameOver = true;
+
+  messageElement.innerHTML = `
+    Game Over<br />
+    Final score: ${score}<br /><br />
+    Click to play again.
+  `;
+
+  messageElement.style.display = "block";
+}
+
+window.addEventListener("resize", resizeCanvas);
+
+window.addEventListener("mousemove", (event) => {
+  mouseX = event.clientX;
+  mouseY = event.clientY;
+});
+
+window.addEventListener("click", () => {
+  if (!running || gameOver) {
+    startGame();
+  }
+});
+
+resizeCanvas();
+draw();
+
+//What does the player do? Protect a "core" in the center of the screen from projectiles, with a shield they control with the mouse. 
+//What is trying to stop them? "Balls" spawn from the edge of the screen, which the player must block with the shield.
+//What does it feel like when they lose? It may feel unfair since they come from all areas of the screen.

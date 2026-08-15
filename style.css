@@ -1,0 +1,46 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+main {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: none;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  padding: 20px;
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+#message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(90vw, 500px);
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font-size: 24px;
+}
