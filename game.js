@@ -24,7 +24,8 @@ let spawnDelay = 900;
 
 const coreRadius = 25;
 const shieldDistance = 105;
-const shieldLength = 150;
+const shieldRadius = 105;
+const shieldArcSize = Math.PI / 2.8; // Width of the curved shield
 const shieldThickness = 12;
 
 function resizeCanvas() {
@@ -53,24 +54,10 @@ function resizeCanvas() {
 function getShield() {
   const angle = Math.atan2(mouseY - centerY, mouseX - centerX);
 
-  const shieldX = centerX + Math.cos(angle) * shieldDistance;
-  const shieldY = centerY + Math.sin(angle) * shieldDistance;
-
-  const perpendicularX = -Math.sin(angle);
-  const perpendicularY = Math.cos(angle);
-
-  const startX = shieldX - perpendicularX * shieldLength / 2;
-  const startY = shieldY - perpendicularY * shieldLength / 2;
-  const endX = shieldX + perpendicularX * shieldLength / 2;
-  const endY = shieldY + perpendicularY * shieldLength / 2;
-
   return {
-    x: shieldX,
-    y: shieldY,
-    startX,
-    startY,
-    endX,
-    endY
+    angle,
+    startAngle: angle - shieldArcSize / 2,
+    endAngle: angle + shieldArcSize / 2
   };
 }
 
@@ -151,6 +138,24 @@ function distanceToLineSegment(pointX, pointY, lineStartX, lineStartY, lineEndX,
   return Math.hypot(pointX - closestX, pointY - closestY);
 }
 
+function normalizeAngle(angle) {
+  while (angle > Math.PI) {
+    angle -= Math.PI * 2;
+  }
+
+  while (angle < -Math.PI) {
+    angle += Math.PI * 2;
+  }
+
+  return angle;
+}
+
+function isAngleInsideArc(angle, startAngle, endAngle) {
+  const relativeAngle = normalizeAngle(angle - startAngle);
+  const arcLength = normalizeAngle(endAngle - startAngle);
+
+  return relativeAngle >= 0 && relativeAngle <= arcLength;
+}
 function update(deltaTime) {
   spawnTimer += deltaTime;
 
