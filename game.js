@@ -34,7 +34,7 @@ const maxEnemies = 10;
 
 const powerUpDuration = 10000;
 const shieldBoostMultiplier = 1.8;
-const powerUpChance = 0.07;
+const powerUpChance = 0.04;
 const powerUpColor = "#B6FF00";
 
 function resizeCanvas() {
