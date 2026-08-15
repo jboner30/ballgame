@@ -120,23 +120,6 @@ function spawnEnemy() {
   });
 }
 
-function distanceToLineSegment(pointX, pointY, lineStartX, lineStartY, lineEndX, lineEndY) {
-  const lineX = lineEndX - lineStartX;
-  const lineY = lineEndY - lineStartY;
-
-  const pointLineX = pointX - lineStartX;
-  const pointLineY = pointY - lineStartY;
-
-  const lineLengthSquared = lineX * lineX + lineY * lineY;
-
-  let position = (pointLineX * lineX + pointLineY * lineY) / lineLengthSquared;
-  position = Math.max(0, Math.min(1, position));
-
-  const closestX = lineStartX + lineX * position;
-  const closestY = lineStartY + lineY * position;
-
-  return Math.hypot(pointX - closestX, pointY - closestY);
-}
 
 function normalizeAngle(angle) {
   while (angle > Math.PI) {
@@ -174,21 +157,32 @@ function update(deltaTime) {
     enemy.x += enemy.velocityX * deltaTime / 1000;
     enemy.y += enemy.velocityY * deltaTime / 1000;
 
-    const shieldDistanceFromEnemy = distanceToLineSegment(
-      enemy.x,
-      enemy.y,
-      shield.startX,
-      shield.startY,
-      shield.endX,
-      shield.endY
-    );
+    const enemyAngle = Math.atan2(
+  enemy.y - centerY,
+  enemy.x - centerX
+);
 
-    if (shieldDistanceFromEnemy < enemy.radius + shieldThickness / 2) {
-      enemies.splice(i, 1);
-      score++;
-      scoreElement.textContent = score;
-      continue;
-    }
+const enemyDistanceFromCore = Math.hypot(
+  enemy.x - centerX,
+  enemy.y - centerY
+);
+
+const isOnShieldArc = isAngleInsideArc(
+  enemyAngle,
+  shield.startAngle,
+  shield.endAngle
+);
+
+const isAtShieldDistance =
+  Math.abs(enemyDistanceFromCore - shieldRadius) <
+  enemy.radius + shieldThickness / 2;
+
+if (isOnShieldArc && isAtShieldDistance) {
+  enemies.splice(i, 1);
+  score++;
+  scoreElement.textContent = score;
+  continue;
+}
 
     const coreDistance = Math.hypot(enemy.x - centerX, enemy.y - centerY);
 
@@ -221,17 +215,18 @@ function drawShield() {
   const shield = getShield();
 
   ctx.beginPath();
-  ctx.moveTo(shield.startX, shield.startY);
-  ctx.lineTo(shield.endX, shield.endY);
+  ctx.arc(
+    centerX,
+    centerY,
+    shieldRadius,
+    shield.startAngle,
+    shield.endAngle
+  );
+
   ctx.strokeStyle = "#fff";
   ctx.lineWidth = shieldThickness;
   ctx.lineCap = "round";
   ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(shield.x, shield.y, shieldThickness / 2, 0, Math.PI * 2);
-  ctx.fillStyle = "#fff";
-  ctx.fill();
 }
 
 function drawEnemies() {
