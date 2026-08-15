@@ -220,10 +220,13 @@ function drawMouseMarker() {
 function draw() {
   ctx.clearRect(0, 0, width, height);
 
-  drawCore();
-  drawShield();
-  drawEnemies();
-  drawMouseMarker();
+  // Only show game objects after the game has started.
+  if (running) {
+    drawCore();
+    drawShield();
+    drawEnemies();
+    drawMouseMarker();
+  }
 }
 
 function gameLoop(timestamp) {
