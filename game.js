@@ -108,7 +108,10 @@ function spawnEnemy() {
     y = Math.random() * height;
   }
 
-  const speed = 85 + Math.min(score * 2, 180);
+  const baseSpeed = 85 + Math.min(score * 2, 180);
+  const speedVariation = Math.random() * 20 - 10; // -10 through +10
+  const speed = baseSpeed + speedVariation;
+
   const direction = Math.atan2(centerY - y, centerX - x);
 
   enemies.push({
