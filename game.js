@@ -108,7 +108,7 @@ function spawnEnemy() {
     y = Math.random() * height;
   }
 
-  const baseSpeed = 75 + Math.min(score * 1.7, 153);
+  const baseSpeed = 75 + Math.min(score * 1.5, 125);
   const speedVariation = Math.random() * 20 - 10; // -10 through +10
   const speed = baseSpeed + speedVariation;
 
