@@ -16,25 +16,28 @@ let mouseY = 0;
 let score = 0;
 let health = 5;
 let enemies = [];
+let powerUps = [];
+
 let running = false;
 let gameOver = false;
 let lastTime = 0;
 let spawnTimer = 0;
 let spawnDelay = 900;
-let powerUps = [];
 let shieldBoostEndTime = 0;
 
 const coreRadius = 25;
-const shieldDistance = 105;
+
 const shieldRadius = 105;
-const shieldArcSize = Math.PI / 2.8; // Width of the curved shield
+const shieldArcSize = Math.PI / 2.8;
 const shieldThickness = 12;
+
 const maxEnemies = 10;
+
 const powerUpRadius = 14;
-const powerUpDuration = 10000; // 10 seconds
-const shieldBoostMultiplier = 1.2; // 20% wider shield
-const powerUpChance = 0.04; // 4% chance per spawn attempt
-const powerUpColor = "#B6FF00"; // Lime green
+const powerUpDuration = 10000;
+const shieldBoostMultiplier = 1.2;
+const powerUpChance = 0.04;
+const powerUpColor = "#B6FF00";
 
 function resizeCanvas() {
   const pixelRatio = window.devicePixelRatio || 1;
@@ -44,7 +47,6 @@ function resizeCanvas() {
 
   canvas.width = width * pixelRatio;
   canvas.height = height * pixelRatio;
-
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
 
@@ -55,8 +57,27 @@ function resizeCanvas() {
 
   if (mouseX === 0 && mouseY === 0) {
     mouseX = centerX;
-    mouseY = centerY - shieldDistance;
+    mouseY = centerY - shieldRadius;
   }
+}
+
+function normalizeAngle(angle) {
+  while (angle > Math.PI) {
+    angle -= Math.PI * 2;
+  }
+
+  while (angle < -Math.PI) {
+    angle += Math.PI * 2;
+  }
+
+  return angle;
+}
+
+function isAngleInsideArc(angle, startAngle, endAngle) {
+  const relativeAngle = normalizeAngle(angle - startAngle);
+  const arcLength = normalizeAngle(endAngle - startAngle);
+
+  return relativeAngle >= 0 && relativeAngle <= arcLength;
 }
 
 function getShield() {
@@ -71,33 +92,35 @@ function getShield() {
   return {
     angle,
     startAngle: angle - currentArcSize / 2,
-    endAngle: angle + currentArcSize / 2
+    endAngle: angle + currentArcSize / 2,
+    arcSize: currentArcSize
   };
 }
 
 function spawnPowerUp() {
-  // Do not place a second power-up until the current one is collected.
   if (powerUps.length > 0) {
     return;
   }
 
-  const padding = 80;
+  // It appears on the same circular orbit as the shield.
+  const angle = Math.random() * Math.PI * 2;
 
   powerUps.push({
-    x: padding + Math.random() * (width - padding * 2),
-    y: padding + Math.random() * (height - padding * 2),
+    x: centerX + Math.cos(angle) * shieldRadius,
+    y: centerY + Math.sin(angle) * shieldRadius,
     radius: powerUpRadius
   });
 }
 
 function spawnEnemy() {
-  if (Math.random() < powerUpChance) {
+  // Test setting: make this 0.04 once you confirm power-ups work.
+  if (Math.random() < 0.25) {
     spawnPowerUp();
     return;
   }
+
   const sides = [0, 1, 2, 3];
 
-  // Do not spawn an enemy directly opposite a nearby enemy.
   const safeSides = sides.filter((side) => {
     return !enemies.some((enemy) => {
       const enemyDistanceFromCore = Math.hypot(
@@ -105,7 +128,6 @@ function spawnEnemy() {
         enemy.y - centerY
       );
 
-      // Only restrict spawning while the existing enemy is threatening.
       if (enemyDistanceFromCore > 280) {
         return false;
       }
@@ -119,7 +141,6 @@ function spawnEnemy() {
     });
   });
 
-  // If every side is restricted, use the full list rather than stopping spawns.
   const availableSides = safeSides.length > 0 ? safeSides : sides;
   const side = availableSides[Math.floor(Math.random() * availableSides.length)];
 
@@ -140,8 +161,8 @@ function spawnEnemy() {
     y = Math.random() * height;
   }
 
-  const baseSpeed = 75 + Math.min(score * 1.5, 125);
-  const speedVariation = Math.random() * 20 - 10; // -10 through +10
+  const baseSpeed = 72 + Math.min(score * 1.7, 153);
+  const speedVariation = Math.random() * 20 - 10;
   const speed = baseSpeed + speedVariation;
 
   const direction = Math.atan2(centerY - y, centerX - x);
@@ -156,58 +177,49 @@ function spawnEnemy() {
   });
 }
 
-
-function normalizeAngle(angle) {
-  while (angle > Math.PI) {
-    angle -= Math.PI * 2;
-  }
-
-  while (angle < -Math.PI) {
-    angle += Math.PI * 2;
-  }
-
-  return angle;
-}
-
-function isAngleInsideArc(angle, startAngle, endAngle) {
-  const relativeAngle = normalizeAngle(angle - startAngle);
-  const arcLength = normalizeAngle(endAngle - startAngle);
-
-  return relativeAngle >= 0 && relativeAngle <= arcLength;
-}
 function update(deltaTime) {
   spawnTimer += deltaTime;
 
   if (spawnTimer >= spawnDelay) {
-  // Do not create more balls while 10 are already active.
-  if (enemies.length < maxEnemies) {
-    spawnEnemy();
-  }
+    if (enemies.length < maxEnemies) {
+      spawnEnemy();
+    }
 
-  spawnTimer = 0;
-  spawnDelay = Math.max(260, 900 - score * 12);
-}
+    spawnTimer = 0;
+    spawnDelay = Math.max(260, 900 - score * 12);
+  }
 
   const shield = getShield();
 
+  // Collect a power-up when it is covered by any part of the curved shield.
   for (let i = powerUps.length - 1; i >= 0; i--) {
-  const powerUp = powerUps[i];
+    const powerUp = powerUps[i];
 
-  const shieldX = centerX + Math.cos(shield.angle) * shieldRadius;
-  const shieldY = centerY + Math.sin(shield.angle) * shieldRadius;
+    const powerUpAngle = Math.atan2(
+      powerUp.y - centerY,
+      powerUp.x - centerX
+    );
 
-  const distanceToShield = Math.hypot(
-    powerUp.x - shieldX,
-    powerUp.y - shieldY
-  );
+    const powerUpDistance = Math.hypot(
+      powerUp.x - centerX,
+      powerUp.y - centerY
+    );
 
-  if (distanceToShield < powerUp.radius + shieldThickness / 2) {
-    powerUps.splice(i, 1);
+    const isOnShieldArc = isAngleInsideArc(
+      powerUpAngle,
+      shield.startAngle,
+      shield.endAngle
+    );
 
-    // Give or refresh a 10-second boost.
-    shieldBoostEndTime = performance.now() + powerUpDuration;
+    const isAtShieldDistance =
+      Math.abs(powerUpDistance - shieldRadius) <
+      powerUp.radius + shieldThickness / 2;
+
+    if (isOnShieldArc && isAtShieldDistance) {
+      powerUps.splice(i, 1);
+      shieldBoostEndTime = performance.now() + powerUpDuration;
+    }
   }
-}
 
   for (let i = enemies.length - 1; i >= 0; i--) {
     const enemy = enemies[i];
@@ -216,35 +228,33 @@ function update(deltaTime) {
     enemy.y += enemy.velocityY * deltaTime / 1000;
 
     const enemyAngle = Math.atan2(
-  enemy.y - centerY,
-  enemy.x - centerX
-);
+      enemy.y - centerY,
+      enemy.x - centerX
+    );
 
-const enemyDistanceFromCore = Math.hypot(
-  enemy.x - centerX,
-  enemy.y - centerY
-);
+    const enemyDistanceFromCore = Math.hypot(
+      enemy.x - centerX,
+      enemy.y - centerY
+    );
 
-const isOnShieldArc = isAngleInsideArc(
-  enemyAngle,
-  shield.startAngle,
-  shield.endAngle
-);
+    const isOnShieldArc = isAngleInsideArc(
+      enemyAngle,
+      shield.startAngle,
+      shield.endAngle
+    );
 
-const isAtShieldDistance =
-  Math.abs(enemyDistanceFromCore - shieldRadius) <
-  enemy.radius + shieldThickness / 2;
+    const isAtShieldDistance =
+      Math.abs(enemyDistanceFromCore - shieldRadius) <
+      enemy.radius + shieldThickness / 2;
 
-if (isOnShieldArc && isAtShieldDistance) {
-  enemies.splice(i, 1);
-  score++;
-  scoreElement.textContent = score;
-  continue;
-}
+    if (isOnShieldArc && isAtShieldDistance) {
+      enemies.splice(i, 1);
+      score++;
+      scoreElement.textContent = score;
+      continue;
+    }
 
-    const coreDistance = Math.hypot(enemy.x - centerX, enemy.y - centerY);
-
-    if (coreDistance < coreRadius + enemy.radius) {
+    if (enemyDistanceFromCore < coreRadius + enemy.radius) {
       enemies.splice(i, 1);
       health--;
       healthElement.textContent = health;
@@ -269,30 +279,6 @@ function drawCore() {
   ctx.stroke();
 }
 
-function drawPowerUps() {
-  for (const powerUp of powerUps) {
-    // Lime green ring
-    ctx.beginPath();
-    ctx.arc(powerUp.x, powerUp.y, powerUp.radius, 0, Math.PI * 2);
-    ctx.strokeStyle = powerUpColor;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // Lime green plus sign
-    ctx.beginPath();
-    ctx.moveTo(powerUp.x - 7, powerUp.y);
-    ctx.lineTo(powerUp.x + 7, powerUp.y);
-
-    ctx.moveTo(powerUp.x, powerUp.y - 7);
-    ctx.lineTo(powerUp.x, powerUp.y + 7);
-
-    ctx.strokeStyle = powerUpColor;
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.stroke();
-  }
-}
-
 function drawShield() {
   const shield = getShield();
 
@@ -311,15 +297,23 @@ function drawShield() {
   ctx.stroke();
 }
 
-function draw() {
-  ctx.clearRect(0, 0, width, height);
+function drawPowerUps() {
+  for (const powerUp of powerUps) {
+    ctx.beginPath();
+    ctx.arc(powerUp.x, powerUp.y, powerUp.radius, 0, Math.PI * 2);
+    ctx.strokeStyle = powerUpColor;
+    ctx.lineWidth = 3;
+    ctx.stroke();
 
-  if (running) {
-    drawCore();
-    drawShield();
-    drawPowerUps();
-    drawEnemies();
-    drawMouseMarker();
+    ctx.beginPath();
+    ctx.moveTo(powerUp.x - 7, powerUp.y);
+    ctx.lineTo(powerUp.x + 7, powerUp.y);
+    ctx.moveTo(powerUp.x, powerUp.y - 7);
+    ctx.lineTo(powerUp.x, powerUp.y + 7);
+    ctx.strokeStyle = powerUpColor;
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.stroke();
   }
 }
 
@@ -342,10 +336,10 @@ function drawMouseMarker() {
 function draw() {
   ctx.clearRect(0, 0, width, height);
 
-  // Only show game objects after the game has started.
   if (running) {
     drawCore();
     drawShield();
+    drawPowerUps();
     drawEnemies();
     drawMouseMarker();
   }
@@ -370,9 +364,9 @@ function startGame() {
   health = 5;
   enemies = [];
   powerUps = [];
-  shieldBoostEndTime = 0;
   spawnTimer = 0;
   spawnDelay = 900;
+  shieldBoostEndTime = 0;
   running = true;
   gameOver = false;
 
@@ -389,8 +383,8 @@ function endGame() {
   gameOver = true;
 
   messageElement.innerHTML = `
-    Game Over<br />
-    Final score: ${score}<br /><br />
+    Game Over<br>
+    Final score: ${score}<br><br>
     Click to play again.
   `;
 
