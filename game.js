@@ -16,7 +16,6 @@ let mouseY = 0;
 let score = 0;
 let health = 5;
 let enemies = [];
-let powerUps = [];
 
 let running = false;
 let gameOver = false;
@@ -33,10 +32,9 @@ const shieldThickness = 12;
 
 const maxEnemies = 10;
 
-const powerUpRadius = 14;
 const powerUpDuration = 10000;
 const shieldBoostMultiplier = 1.2;
-const powerUpChance = 0.04;
+const powerUpChance = 0.07;
 const powerUpColor = "#B6FF00";
 
 function resizeCanvas() {
@@ -92,33 +90,11 @@ function getShield() {
   return {
     angle,
     startAngle: angle - currentArcSize / 2,
-    endAngle: angle + currentArcSize / 2,
-    arcSize: currentArcSize
+    endAngle: angle + currentArcSize / 2
   };
 }
 
-function spawnPowerUp() {
-  if (powerUps.length > 0) {
-    return;
-  }
-
-  // It appears on the same circular orbit as the shield.
-  const angle = Math.random() * Math.PI * 2;
-
-  powerUps.push({
-    x: centerX + Math.cos(angle) * shieldRadius,
-    y: centerY + Math.sin(angle) * shieldRadius,
-    radius: powerUpRadius
-  });
-}
-
 function spawnEnemy() {
-  // Test setting: make this 0.04 once you confirm power-ups work.
-  if (Math.random() < 0.25) {
-    spawnPowerUp();
-    return;
-  }
-
   const sides = [0, 1, 2, 3];
 
   const safeSides = sides.filter((side) => {
@@ -167,13 +143,17 @@ function spawnEnemy() {
 
   const direction = Math.atan2(centerY - y, centerX - x);
 
+  // A power-up uses an enemy slot and moves exactly like an enemy.
+  const isPowerUp = Math.random() < powerUpChance;
+
   enemies.push({
     x,
     y,
     radius: 10,
     velocityX: Math.cos(direction) * speed,
     velocityY: Math.sin(direction) * speed,
-    spawnSide: side
+    spawnSide: side,
+    isPowerUp
   });
 }
 
@@ -191,35 +171,6 @@ function update(deltaTime) {
 
   const shield = getShield();
 
-  // Collect a power-up when it is covered by any part of the curved shield.
-  for (let i = powerUps.length - 1; i >= 0; i--) {
-    const powerUp = powerUps[i];
-
-    const powerUpAngle = Math.atan2(
-      powerUp.y - centerY,
-      powerUp.x - centerX
-    );
-
-    const powerUpDistance = Math.hypot(
-      powerUp.x - centerX,
-      powerUp.y - centerY
-    );
-
-    const isOnShieldArc = isAngleInsideArc(
-      powerUpAngle,
-      shield.startAngle,
-      shield.endAngle
-    );
-
-    const isAtShieldDistance =
-      Math.abs(powerUpDistance - shieldRadius) <
-      powerUp.radius + shieldThickness / 2;
-
-    if (isOnShieldArc && isAtShieldDistance) {
-      powerUps.splice(i, 1);
-      shieldBoostEndTime = performance.now() + powerUpDuration;
-    }
-  }
 
   for (let i = enemies.length - 1; i >= 0; i--) {
     const enemy = enemies[i];
@@ -247,22 +198,33 @@ function update(deltaTime) {
       Math.abs(enemyDistanceFromCore - shieldRadius) <
       enemy.radius + shieldThickness / 2;
 
-    if (isOnShieldArc && isAtShieldDistance) {
-      enemies.splice(i, 1);
-      score++;
-      scoreElement.textContent = score;
-      continue;
+  if (isOnShieldArc && isAtShieldDistance) {
+    enemies.splice(i, 1);
+
+    if (enemy.isPowerUp) {
+    // Activate or refresh the 10-second, 20%-wider shield effect.
+    shieldBoostEndTime = performance.now() + powerUpDuration;
+    } else {
+    score++;
+    scoreElement.textContent = score;
     }
+
+  continue;
+}
 
     if (enemyDistanceFromCore < coreRadius + enemy.radius) {
-      enemies.splice(i, 1);
-      health--;
-      healthElement.textContent = health;
+  enemies.splice(i, 1);
 
-      if (health <= 0) {
-        endGame();
-      }
+  // A missed lime-green power-up is harmless.
+  if (!enemy.isPowerUp) {
+    health--;
+    healthElement.textContent = health;
+
+    if (health <= 0) {
+      endGame();
     }
+  }
+}
   }
 }
 
@@ -297,31 +259,16 @@ function drawShield() {
   ctx.stroke();
 }
 
-function drawPowerUps() {
-  for (const powerUp of powerUps) {
-    ctx.beginPath();
-    ctx.arc(powerUp.x, powerUp.y, powerUp.radius, 0, Math.PI * 2);
-    ctx.strokeStyle = powerUpColor;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(powerUp.x - 7, powerUp.y);
-    ctx.lineTo(powerUp.x + 7, powerUp.y);
-    ctx.moveTo(powerUp.x, powerUp.y - 7);
-    ctx.lineTo(powerUp.x, powerUp.y + 7);
-    ctx.strokeStyle = powerUpColor;
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.stroke();
-  }
-}
 
 function drawEnemies() {
   for (const enemy of enemies) {
     ctx.beginPath();
     ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff";
+
+    ctx.fillStyle = enemy.isPowerUp
+      ? powerUpColor
+      : "#fff";
+
     ctx.fill();
   }
 }
@@ -339,7 +286,6 @@ function draw() {
   if (running) {
     drawCore();
     drawShield();
-    drawPowerUps();
     drawEnemies();
     drawMouseMarker();
   }
@@ -363,7 +309,6 @@ function startGame() {
   score = 0;
   health = 5;
   enemies = [];
-  powerUps = [];
   spawnTimer = 0;
   spawnDelay = 900;
   shieldBoostEndTime = 0;
